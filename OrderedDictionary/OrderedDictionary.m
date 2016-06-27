@@ -174,7 +174,6 @@
 {
 @protected
     NSOrderedSet *_preserved;
-    NSMutableDictionary *_pending;
 }
 
 #define _mutableValues ((NSMutableArray *)_values)
@@ -190,7 +189,6 @@
         _values = [[NSMutableArray alloc] initWithObjects:objects count:count];
         _keys = [[NSMutableOrderedSet alloc] initWithObjects:keys count:count];
         _preserved = [[NSMutableOrderedSet alloc] init];
-        _pending = @{}.mutableCopy;
     }
     return self;
 }
@@ -200,7 +198,6 @@
         _values = [[NSMutableArray alloc] initWithCapacity:capacity];
         _keys = [[NSMutableOrderedSet alloc] initWithCapacity:capacity];
         _preserved = [[NSMutableOrderedSet alloc] initWithCapacity:capacity];
-        _pending = @{}.mutableCopy;
     }
     return self;
 }
@@ -300,6 +297,12 @@
     if (index < _mutableKeys.count) {
         [_mutableKeys insertObject:key atIndex:index];
         [_mutableValues insertObject:object atIndex:index];
+        
+        NSArray<NSNumber *> *preserves = [_preserved filteredOrderedSetUsingPredicate:[NSPredicate predicateWithFormat:@"self >= %d", index]];
+        for (NSNumber *preserve in preserves) {
+            [self exchangeObjectAtIndex:preserve.integerValue withObjectAtIndex:preserve.integerValue - 1];
+        }
+        
     } else {
         index = (index < _mutableKeys.count) ? index : MIN(index, _mutableKeys.count ? _mutableKeys.count - 1 : 0);
         [_mutableKeys insertObject:key atIndex:index];
