@@ -294,45 +294,51 @@
 
 - (void)insertObject:(id)object forKey:(id)key atIndex:(NSUInteger)index {
     [self removeObjectForKey:key];
-    if (index < _mutableKeys.count) {
+    
+    NSArray<NSNumber *> *preserves = [_preserved filteredOrderedSetUsingPredicate:[NSPredicate predicateWithFormat:@"self > %d", index]];
+    
+    if (index < self.count) {
         [_mutableKeys insertObject:key atIndex:index];
         [_mutableValues insertObject:object atIndex:index];
         
-        NSArray<NSNumber *> *preserves = [_preserved filteredOrderedSetUsingPredicate:[NSPredicate predicateWithFormat:@"self >= %d", index]];
         for (NSNumber *preserve in preserves) {
-            [self exchangeObjectAtIndex:preserve.integerValue withObjectAtIndex:preserve.integerValue - 1];
+            [self exchangeObjectAtIndex:preserve.integerValue + 1 withObjectAtIndex:preserve.integerValue];
         }
         
     } else {
-        index = (index < _mutableKeys.count) ? index : MIN(index, _mutableKeys.count ? _mutableKeys.count - 1 : 0);
-        [_mutableKeys insertObject:key atIndex:index];
-        [_mutableValues insertObject:object atIndex:index];
+        [self addObject:object forKey:key atIndex:[_preserved indexOfObject:@(index)]];
     }
 }
 
 - (void)insertObject:(id)object forKey:(id)key atPreservableIndex:(NSUInteger)index {
-    [self insertObject:object forKey:key atIndex:index];
-    
     if (![_mutablePreserves containsObject:@(index)]) {
         [_mutablePreserves addObject:@(index)];
+        [_mutablePreserves sortUsingComparator:(NSComparator)^(NSNumber *obj1, NSNumber *obj2){
+            return obj1 > obj2;
+        }];
+        [self insertObject:object forKey:key atIndex:index];
     } else {
         NSLog(@"%s Warning: Ignoring preserved index request due to an existing index at %lu", index);
     }
 }
 
-- (void)addObject:(id)object forKey:(id)key {
-    NSInteger preservedCount = [_preserved filteredOrderedSetUsingPredicate:[NSPredicate predicateWithFormat:@"self >= %d", self.count]].count;
-    
-    NSInteger index = self.count - preservedCount;
-    
+- (void)addObject:(id)object forKey:(id)key atIndex:(NSInteger)index {
     while ([_mutablePreserves containsObject:@(index)]) {
-        ++index;
+        index++;
     }
     
     [self removeObjectForKey:key];
+    
     [_mutableKeys insertObject:key atIndex:index];
     [_mutableValues insertObject:object atIndex:index];
 }
+
+- (void)addObject:(id)object forKey:(id)key {
+    NSInteger preservedCount = [_preserved filteredOrderedSetUsingPredicate:[NSPredicate predicateWithFormat:@"self >= %d", self.count ? self.count - 1 : 0]].count;
+    NSInteger index =  self.count - preservedCount;
+    [self addObject:object forKey:key atIndex:index];
+}
+
 
 - (void)addObjects:(NSArray <id> *)objects withKeys:(NSArray <id> *)keys {
     NSAssert(objects.count != keys.count, @"Number of objects must equal the number of keys provided.");
